@@ -25,6 +25,27 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
+	num_particles = 150;
+
+	// This lines creates a normal (Gaussian) distribution for x, y and theta
+	normal_distribution<double> dist_x(x, std[0]);
+	normal_distribution<double> dist_y(y, std[1]);
+	normal_distribution<double> dist_theta(theta, std[2]);
+
+	default_random_engine gen;
+
+	for(int i=0; i<=num_particles; i++){
+		Particle p;
+		p.id = i;
+		p.x = dist_x(gen);
+		p.y = dist_y(gen);
+		p.theta = dist_theta(gen);
+		p.weight = 1.0;
+
+		particles.push_back(p);
+	}
+
+	is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -33,6 +54,28 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	for (int i=0; i<=num_particles; i++){
+		float x_0 = particles[i].x;
+		float y_0 = particles[i].y;
+		float theta_0 = particles[i].theta;
+		if (yaw_rate > 0.00001){
+			particles[i].x = x_0 + (velocity / yaw_rate) * (sin(theta_0 + yaw_rate * delta_t) - sin(theta_0));
+			particles[i].y = y_0 + (velocity / yaw_rate) * (cos(theta_0) - cos(theta_0 + yaw_rate * delta_t));
+			particles[i].theta = theta_0 + yaw_rate * delta_t;
+		}
+		else{
+			particles[i].x = x_0 + velocity * delta_t * cos(theta_0);
+			particles[i].y = y_0 + velocity * delta_t * sin(theta_0);
+		}
+		// add noise with radom noise generators
+		normal_distribution<double> dist_x(0, std_pos[0]);
+		normal_distribution<double> dist_y(0, std_pos[1]);
+		normal_distribution<double> dist_theta(0, std_pos[2]);
+		default_random_engine gen;
+		particles[i].x += dist_x(gen);
+		particles[i].y += dist_y(gen);
+		particles[i].theta += dist_theta(gen);
+	}
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
