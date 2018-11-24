@@ -117,6 +117,51 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
+	for (int i=0; i<particles.size(); i++){ // for each particle
+		Particle particle = particles[i];
+		
+		vector<LandmarkObs> predictions; // initialize a list of all the valid landmarks whithin sensor range
+		for (int j=0; j<map_landmarks.landmark_list.size(); j++){
+			double x_landmark = map_landmarks.landmark_list[j].x_f;
+			double y_landmark = map_landmarks.landmark_list[j].y_f;
+			double id_landmark = map_landmarks.landmark_list[j].id_i;
+
+			if (dist(particle.x, particle.y, x_landmark, y_landmark) <= sensor_range){
+				predictions.push_back(LandmarkObs{ id_landmark, x_landmark, y_landmark });
+			}
+		}
+
+		// convert observation from vehicle coordinates to map coordinates
+		vector<LandmarkObs> obs_tran; // (observations transformed)
+		for(int j=0; j<observations.size(); j++){
+			LandmarkObs obs_orig = observations[j];
+			double x_obs = particle.x + cos(particle.theta) * obs_orig.x - sin(particle.theta) * obs_orig.y;
+			double y_obs = particle.y + sin(particle.theta) * obs_orig.x + cos(particle.theta) * obs_orig.y;
+			obs_tran.push_back(LandmarkObs{obs_orig.id, x_obs, y_obs});
+		}
+		// find the colsest landmark to each observation
+		dataAssociation(predictions, obs_tran);
+
+		// calculate the probability of each particle according to multivariant gaussian distribution
+		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
+		
+		particles[i].weight = 1.0; // reinitialize the particle weight
+		for (int j; j<obs_tran.size(); j++){
+			LandmarkObs obs = obs_tran[j];
+			// get the x,y coordinates of the prediction associated with the current observation
+			for (int k = 0; k < predictions.size(); k++) {
+				if (predictions[k].id == obs.id) {
+					LandmarkObs land_mark = predictions[k];
+				}
+			}
+			double exponent = pow((obs.x-land_mark.x)/std_landmark[0], 2) / 2;
+			exponent += pow((obs.y-land_mark.y)/std_landmark[1], 2) / 2;
+			// particle weight would bw the combination of the probabilities of all observations
+			particles[i].weight *= gauss_norm * exp(-exponent);
+		}
+
+	}
 }
 
 void ParticleFilter::resample() {
