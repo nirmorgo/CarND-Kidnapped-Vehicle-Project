@@ -167,12 +167,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			x_obs = obs_tran[j].x;
 			y_obs = obs_tran[j].y;
 			int target_id = obs_tran[j].id;
-			//cout <<"target id: "<<target_id<<"\n";
 			// get the x,y coordinates of the prediction associated with the current observation
 			for (unsigned int k = 0; k < valid_preds.size(); k++) {
-				//cout <<"prediction id: "<<valid_preds[k].id<<"\n";
 				if (valid_preds[k].id == target_id) {
-					//cout << "found a match!\n";
 					x_pred = valid_preds[k].x;
 					y_pred = valid_preds[k].y;
 					associations.push_back(valid_preds[k].id);
