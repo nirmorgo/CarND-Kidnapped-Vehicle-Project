@@ -18,6 +18,7 @@
 #include "particle_filter.h"
 
 using namespace std;
+default_random_engine gen;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -32,9 +33,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	normal_distribution<double> dist_y(y, std[1]);
 	normal_distribution<double> dist_theta(theta, std[2]);
 
-	default_random_engine gen;
-
-	for(int i=0; i<=num_particles; i++){
+	for(int i=0; i < num_particles; i++){
 		Particle p;
 		p.id = i;
 		p.x = dist_x(gen);
@@ -54,27 +53,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
-	for (int i=0; i<=num_particles; i++){
-		float x_0 = particles[i].x;
-		float y_0 = particles[i].y;
-		float theta_0 = particles[i].theta;
-		if (yaw_rate > 0.00001){
-			particles[i].x = x_0 + (velocity / yaw_rate) * (sin(theta_0 + yaw_rate * delta_t) - sin(theta_0));
-			particles[i].y = y_0 + (velocity / yaw_rate) * (cos(theta_0) - cos(theta_0 + yaw_rate * delta_t));
-			particles[i].theta = theta_0 + yaw_rate * delta_t;
+	double x, y, t;
+	for (int i=0; i<num_particles; i++){
+		x = particles[i].x;
+		y = particles[i].y;
+		t = particles[i].theta;
+		if (fabs(yaw_rate) > 0.001){
+			x += velocity / yaw_rate * (sin(t + yaw_rate * delta_t) - sin(t));
+			y += velocity / yaw_rate * (cos(t) - cos(t + yaw_rate * delta_t));
 		}
 		else{
-			particles[i].x = x_0 + velocity * delta_t * cos(theta_0);
-			particles[i].y = y_0 + velocity * delta_t * sin(theta_0);
+			x += velocity * delta_t * cos(t + yaw_rate * delta_t / 2);
+			y += velocity * delta_t * sin(t + yaw_rate * delta_t / 2);
 		}
-		// add noise with radom noise generators
-		normal_distribution<double> dist_x(0, std_pos[0]);
-		normal_distribution<double> dist_y(0, std_pos[1]);
-		normal_distribution<double> dist_theta(0, std_pos[2]);
-		default_random_engine gen;
-		particles[i].x += dist_x(gen);
-		particles[i].y += dist_y(gen);
-		particles[i].theta += dist_theta(gen);
+		t += yaw_rate * delta_t;
+		
+		// add noise with radom noise generators and update the particles
+		particles[i].x = normal_distribution<double>(x, std_pos[0])(gen);
+		particles[i].y = normal_distribution<double>(y, std_pos[1])(gen);
+		particles[i].theta = normal_distribution<double>(t, std_pos[2])(gen);
 	}
 }
 
@@ -84,23 +81,25 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
+	vector<int> visited;
 	for (unsigned int i; i < observations.size(); i++){
 
 		LandmarkObs obs = observations[i];
-		double min_dist = 1e44; // init min_dist to a very large value
+		double min_dist = 1e99; // init min_dist to a very large value
 
 		int map_id = -1; // init the map id to -1
 
-		for (unsigned int j; j<predicted.size(); j++){
+		for (unsigned int j=0; j<predicted.size(); j++){
 
 			LandmarkObs	pred = predicted[j];
 			double temp_dist = dist(obs.x, obs.y, pred.x, pred.y);
-			if (temp_dist < min_dist){
+			bool been_visited = find(visited.begin(), visited.end(), pred.id) != visited.end();
+			if ((temp_dist < min_dist) & !been_visited){
 				min_dist = temp_dist;
 				map_id = pred.id;
 			}
 		}
-
+		visited.push_back(map_id);
 		observations[i].id = map_id; // set to closest measurement map id to the observation
 	}
 }
